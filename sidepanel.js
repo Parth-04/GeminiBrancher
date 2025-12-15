@@ -73,16 +73,20 @@ document.getElementById("askBtn").addEventListener('click', async() => {
 
     try {
         const prompt =  `
-        I have a conversation transcript between the user and the AI below, please answer the user's query based on it:
+        You are a knowledgeable AI chatbot. I am having a conversation (transcript provided below) and I have a few follow-up questions.
+        
+        Use the transcript to understand the context of the topic, but **do not** limit your answer to just the text below. Use your general knowledge to explain concepts and solve doubts.
 
-        --- TRANSCRIPT START ---
+        --- CONVERSATION CONTEXT ---
         ${currentContext}
-        --- TRANSCRIPT END ---
+        --- END CONTEXT ---
 
-        User Question: ${question}
-
-        Instructions:
-        1. Answer the questions based on your knowledge, not just the transcript.
+        My Question: ${question}
+        
+        Answer Guidelines:
+        1. **Strict Length Limit:** Keep your answer under 5 lines.
+        2. Be informative and direct.
+        3. You may use outside knowledge to explain better, but keep it brief.
         `;
 
         const answer = await callGeminiAPI(prompt);
