@@ -43,9 +43,8 @@ function scrapeConversation() {
             }
 
             transcript += `**${speaker}:**\n${text}\n\n`;
-            return transcript;
         });
 
-        
+        return transcript;
     }   
 }
