@@ -7,10 +7,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.action === "get_full_context") {
-        const transcript = scrapeConversation();
+        const scrapedData = scrapeConversation();
 
-        if (transcript.length > 0){
-            sendResponse({status: "success", context: transcript});
+        if (scrapedData.fullTranscript.length > 0){
+            sendResponse({status: "success", context: scrapedData.fullTranscript, lastModelResponse: scrapedData.lastReply});
         } else{
             sendResponse({status:"error", message: "Could not detect conversation. Try scrolling to the top of the chat."});
         }
@@ -22,6 +22,7 @@ function scrapeConversation() {
     let transcript = "";
 
     const textContainers = document.querySelectorAll('user-query-content, model-response');
+    let lastModelResponse = "";
     
     if (!textContainers) {
         console.log("Gemini Branch: No <main> found, falling back to body.");
@@ -40,11 +41,15 @@ function scrapeConversation() {
                 speaker = "User";
             } else if (tagName === 'model-response'){
                 speaker = "Gemini";
+                lastModelResponse = text;
             }
 
             transcript += `**${speaker}:**\n${text}\n\n`;
         });
 
-        return transcript;
+        return {
+            fullTranscript: transcript,
+            lastReply: lastModelResponse
+        };
     }   
 }

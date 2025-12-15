@@ -5,58 +5,71 @@ let currentContext = "";
 chrome.storage.local.get(['geminiChatContext'], (result) => {
     if (result.geminiChatContext){
         currentContext = result.geminiChatContext;
-        updateUI(result.geminiChatContext, "storage");
+        dispResp = result.geminiChatDisplay;
+        updateUI(currentContext, dispResp, "storage");
     }
 })
 
 
 document.getElementById("scrapeBtn").addEventListener('click', async () => {
-    const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
+    const scrapeBtn = document.getElementById('scrapeBtn');
     const outputBox = document.getElementById('debug-output');
 
+    scrapeBtn.disabled = true;
+    scrapeBtn.innerText = 'Scraping...';
+    outputBox.innerText = 'Fetching content from active tab'
+
     try {
+        const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
+        
+        // if(!tab.url.startsWith('http')){
+        //     throw new Error("Cannot scrape this page type.");
+        // }
+        
         const response = await chrome.tabs.sendMessage(tab.id, {action: "get_full_context"});
         
+
         if(!response) {
-            outputBox.innerText = "No response from the Content Script";
-            return;
+            throw new Error ("No response from Content Script. Try refreshing the page.");
         }
 
         if (response.status === "success") {
             currentContext = response.context;
+            dispResp = response.lastModelResponse;
             chrome.storage.local.set({'geminiChatContext': response.context});
-            updateUI(currentContext, "updated");
+            chrome.storage.local.set({'geminiChatDisplay': response.lastModelResponse})
+            updateUI(currentContext, dispResp, "updated");
         } else if (response.status === "error") { 
-            outputBox.innerText = "Error \n" + response.message;
-            console.log(response.message);
+            throw new Error(response.message || "Unknown error during scraping process.");
         }
    
 
-    } catch (error) { // Added required 'catch' block
+    } catch (error) { 
         outputBox.innerText = "An error occurred during communication: \n" + error.message;
-        console.error(error); // Log the error to the console
+        console.error(error);
+    } finally {
+        scrapeBtn.disabled = false;
+        scrapeBtn.innerText = "Update Context";
     }
 });
 
 document.getElementById("askBtn").addEventListener('click', async() => {
-    console.log("Submit button clicked!");
-    
-    const question = document.getElementById('user-input').value;
+    const askBtn = document.getElementById('askBtn');
+    const question = document.getElementById('user-input').value.trim();
     const responseBox = document.getElementById('ai-response');
-
-    console.log("Question: ", question);
-
 
     if (!currentContext) {
         responseBox.innerText = "Please Update the Context First!";
         return;
     }
     if (!question){
-        responseBox.innerText = "Please ask a question";
+        responseBox.innerText = "Please type a question";
         return;
     }
 
-    responseBox.innerText = "Thinking...";
+    askBtn.disabled = true;
+    askBtn.innerText = "Thinking...";
+    responseBox.innerText = "Analyzing context...";
 
     try {
         const prompt =  `
@@ -64,10 +77,12 @@ document.getElementById("askBtn").addEventListener('click', async() => {
 
         --- TRANSCRIPT START ---
         ${currentContext}
-        --- TRANSCRIPT START ---
+        --- TRANSCRIPT END ---
 
         User Question: ${question}
-        Important Guideline: Make sure to answer the question in a maximum of 5 lines.
+
+        Instructions:
+        1. Answer the questions based on your knowledge, not just the transcript.
         `;
 
         const answer = await callGeminiAPI(prompt);
@@ -81,20 +96,24 @@ document.getElementById("askBtn").addEventListener('click', async() => {
 
     } catch (error) {
         responseBox.innerText = "API Error: " + error.message;
+        console.error("API Error:", error);
+    } finally {
+        askBtn.disabled = false;
+        askBtn.innerText = "Ask Gemini";
     }
 });
 
-function updateUI(text, status) {
+function updateUI(text, displayResponse, status) {
     const outputBox = document.getElementById('debug-output');
 
     if (typeof marked !== 'undefined') {
         if (status === "storage"){
-            outputBox.innerHTML = "Fetched from Storage \n" + marked.parse(text);
+            outputBox.innerHTML = "Fetched from Storage \n" + marked.parse(displayResponse);
         }
         else if (status === "updated"){
-            outputBox.innerHTML = "Context Freshly Updated \n" + marked.parse(text);
+            outputBox.innerHTML = "Context Freshly Updated \n" + marked.parse(displayResponse);
         } else {
-            outputBox.innerHTML = "Status Unknown \n" + marked.parse(text);
+            outputBox.innerHTML = "Status Unknown \n" + marked.parse(displayResponse);
         }
         
     } else {
