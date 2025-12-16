@@ -1,4 +1,4 @@
-const GEMINI_API_KEY = "AIzaSyA8sLCX-hlT6ci6sad_4NpuhOAvM3iB90k";
+const GEMINI_API_KEY = "API_KEY";
 
 let currentContext = "";
 
@@ -10,48 +10,18 @@ chrome.storage.local.get(['geminiChatContext'], (result) => {
     }
 })
 
+chrome.runtime.onMessage.addListener((message) => {
+    if(message.action === "context_auto_update"){
+        currentContext = message.context;
+        updateUI(currentContext, message.lastModelResponse, "auto");
 
-document.getElementById("scrapeBtn").addEventListener('click', async () => {
-    const scrapeBtn = document.getElementById('scrapeBtn');
-    const outputBox = document.getElementById('debug-output');
-
-    scrapeBtn.disabled = true;
-    scrapeBtn.innerText = 'Scraping...';
-    outputBox.innerText = 'Fetching content from active tab'
-
-    try {
-        const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
-        
-        // if(!tab.url.startsWith('http')){
-        //     throw new Error("Cannot scrape this page type.");
-        // }
-        
-        const response = await chrome.tabs.sendMessage(tab.id, {action: "get_full_context"});
-        
-
-        if(!response) {
-            throw new Error ("No response from Content Script. Try refreshing the page.");
-        }
-
-        if (response.status === "success") {
-            currentContext = response.context;
-            dispResp = response.lastModelResponse;
-            chrome.storage.local.set({'geminiChatContext': response.context});
-            chrome.storage.local.set({'geminiChatDisplay': response.lastModelResponse})
-            updateUI(currentContext, dispResp, "updated");
-        } else if (response.status === "error") { 
-            throw new Error(response.message || "Unknown error during scraping process.");
-        }
-   
-
-    } catch (error) { 
-        outputBox.innerText = "An error occurred during communication: \n" + error.message;
-        console.error(error);
-    } finally {
-        scrapeBtn.disabled = false;
-        scrapeBtn.innerText = "Update Context";
+        chrome.storage.local.set({
+            'geminiChatContext': message.context,
+            'geminiChatDisplay': message.lastModelResponse
+        });
     }
 });
+
 
 document.getElementById("askBtn").addEventListener('click', async() => {
     const askBtn = document.getElementById('askBtn');
@@ -116,7 +86,9 @@ function updateUI(text, displayResponse, status) {
         }
         else if (status === "updated"){
             outputBox.innerHTML = "Context Freshly Updated \n" + marked.parse(displayResponse);
-        } else {
+        } else if (status === "auto"){
+            outputBox.innerHTML = "Context Updated \n" + marked.parse(displayResponse);
+        }  else {
             outputBox.innerHTML = "Status Unknown \n" + marked.parse(displayResponse);
         }
         

@@ -1,22 +1,30 @@
 console.log("Gemini Branch: Content Script is Active on Gemini!");
 
+let lastScrapedtranscript = "";
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "test_connection"){
         alert("Connection Successful! The sidebar is talking to Gemini!");
         sendResponse({status: "success"});
     }
-
-    if (request.action === "get_full_context") {
-        const scrapedData = scrapeConversation();
-
-        if (scrapedData.fullTranscript.length > 0){
-            sendResponse({status: "success", context: scrapedData.fullTranscript, lastModelResponse: scrapedData.lastReply});
-        } else{
-            sendResponse({status:"error", message: "Could not detect conversation. Try scrolling to the top of the chat."});
-        }
-    } return true;
 })
 
+setInterval(() =>{
+    const data = scrapeConversation();
+
+    if (data.fullTranscript !== lastScrapedtranscript && data.fullTranscript.length > 0){
+        console.log("Transcript Updated");
+        lastScrapedtranscript = data.fullTranscript;
+
+        chrome.runtime.sendMessage({
+            action: "context_auto_update",
+            context: data.fullTranscript,
+            lastModelResponse: data.lastReply
+        }).catch(err => {
+
+        })
+    }
+}, 2000);
 
 function scrapeConversation() {
     let transcript = "";
